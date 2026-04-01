@@ -252,7 +252,7 @@ docker compose up -d
 
 ### NordVPN
 
-[NordVPN](https://nordvpn.com) supports OpenVPN config files. WireGuard is available only via their proprietary NordLynx protocol (app-only).
+[NordVPN](https://refer-nordvpn.com/CKtwPrhUroe) supports OpenVPN config files. WireGuard is available only via their proprietary NordLynx protocol (app-only).
 
 1. Log in to [my.nordaccount.com](https://my.nordaccount.com/)
 2. Go to **Settings** → **Manual setup** → **OpenVPN configuration files**
@@ -296,7 +296,7 @@ docker compose up -d
 |----------|:-------:|:---------:|:-------------:|-------|
 | [AirVPN](https://airvpn.org/?referred_by=684381) | ✅ | ✅ | No (inline certs) | Full config generator |
 | [Mullvad](https://mullvad.net) | ✅ (deprecated) | ✅ | Account number | WireGuard preferred |
-| [NordVPN](https://nordvpn.com) | ✅ | ❌ | Service credentials | NordLynx is app-only |
+| [NordVPN](https://refer-nordvpn.com/CKtwPrhUroe) | ✅ | ❌ | Service credentials | NordLynx is app-only |
 | [ExpressVPN](https://www.expressvpn.com) | ✅ | ❌ | Manual config creds | WireGuard is app-only |
 
 > Any VPN provider that offers standard OpenVPN (`.ovpn`) or WireGuard (`wg-quick`) config files will work with vpnsocksify.
