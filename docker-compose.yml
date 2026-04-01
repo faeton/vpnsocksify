@@ -1,0 +1,27 @@
+services:
+  vpnsocksifier:
+    build: .
+    container_name: ${CONTAINER_NAME:-vpnsocksifier}
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:${SOCKS_PORT:-1080}:${SOCKS_PORT:-1080}"
+    volumes:
+      - ${VPN_CONFIG_PATH:-./config}:/config:ro
+    environment:
+      - SOCKS_PORT=${SOCKS_PORT:-1080}
+      - SOCKS_USER=${SOCKS_USER:-}
+      - SOCKS_PASS=${SOCKS_PASS:-}
+      - VPN_USER=${VPN_USER:-}
+      - VPN_PASS=${VPN_PASS:-}
+      - DNS_SERVERS=${DNS_SERVERS:-1.1.1.1,8.8.8.8}
+      - KILL_SWITCH=${KILL_SWITCH:-true}
+      - VPN_LOG_LEVEL=${VPN_LOG_LEVEL:-3}
+      - CONNECTION_TEST_URL=${CONNECTION_TEST_URL:-https://api.ipify.org}
+      - CONNECTION_TEST_TIMEOUT=${CONNECTION_TEST_TIMEOUT:-60}
+    restart: unless-stopped
