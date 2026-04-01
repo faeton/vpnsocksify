@@ -101,6 +101,50 @@ CONTAINER_NAME=vpn-local SOCKS_PORT=3080 BIND_ADDR=127.0.0.1 \
   docker compose -p vpn-local up -d
 ```
 
+### Use Case: Firefox Multi-Account Containers
+
+A powerful combination is running multiple vpnsocksify instances with [Firefox Multi-Account Containers](https://github.com/mozilla/multi-account-containers). Each container tab gets its own isolated VPN exit — different cookies, different IP addresses, full separation.
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Firefox                                             │
+│                                                     │
+│  🟣 Personal    ──▶  vpn-ro:1080  ──▶  Romania     │
+│  🟢 Banking     ──▶  vpn-ch:2080  ──▶  Switzerland │
+│  🟡 Shopping    ──▶  vpn-us:3080  ──▶  United States│
+│  🔵 Work        ──▶  (no proxy)   ──▶  Direct      │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Setup:**
+
+1. Launch multiple vpnsocksify instances (one per country/identity):
+
+```bash
+# Romania exit
+CONTAINER_NAME=vpn-ro SOCKS_PORT=1080 VPN_CONFIG_PATH=./config/romania \
+  docker compose -p vpn-ro up -d
+
+# Switzerland exit
+CONTAINER_NAME=vpn-ch SOCKS_PORT=2080 VPN_CONFIG_PATH=./config/switzerland \
+  docker compose -p vpn-ch up -d
+
+# US exit
+CONTAINER_NAME=vpn-us SOCKS_PORT=3080 VPN_CONFIG_PATH=./config/us \
+  docker compose -p vpn-us up -d
+```
+
+2. Install [Firefox Multi-Account Containers](https://addons.mozilla.org/en-US/firefox/addon/multi-account-containers/)
+
+3. For each container, go to **Container Settings** → **Advanced proxy settings** and set:
+   - **SOCKS Host:** `localhost` (or your server IP)
+   - **Port:** the port for that instance (1080, 2080, 3080, etc.)
+   - **SOCKS v5** selected
+   - Enable **Proxy DNS** to prevent DNS leaks
+
+Now every tab opened in that container routes through its own VPN — different IP, different cookies, fully isolated browsing contexts.
+
 ## Configuration
 
 All settings are configured via environment variables. Set them in `.env` or pass them directly.
