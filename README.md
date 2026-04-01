@@ -26,6 +26,36 @@ A lightweight Docker container that connects to a VPN (OpenVPN or WireGuard), ve
 - **Interactive launcher** — `launch.sh` prompts for config selection, port, and credentials
 - **Tiny footprint** — Alpine Linux base, ~47MB image
 
+## CLAUDE.md
+
+If you're using [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or any AI coding agent, add this to your `CLAUDE.md`:
+
+```markdown
+# vpnsocksify
+
+This project is a Docker container that runs a VPN client + SOCKS5 proxy.
+
+## Key files
+- `Dockerfile` — Alpine 3.19 base with openvpn, wireguard-tools, dante-server
+- `entrypoint.sh` — Main orchestration: VPN detection, kill switch, VPN start, SOCKS5 start
+- `sockd.conf.template` — Dante SOCKS5 config (envsubst-templated)
+- `healthcheck.sh` — Curls through the SOCKS5 proxy to verify full chain
+- `docker-compose.yml` — Container definition with NET_ADMIN, tun device, sysctls
+- `launch.sh` — Interactive launcher script
+
+## How to run
+1. Place VPN configs (.ovpn or .conf) in `config/`
+2. `cp .env.example .env` and edit as needed
+3. `docker compose build && docker compose up -d`
+4. Test: `curl --proxy socks5h://user:pass@localhost:1080 https://api.ipify.org`
+
+## Multi-instance
+Set CONTAINER_NAME, SOCKS_PORT, VPN_CONFIG_PATH env vars and use `-p <name>` with docker compose.
+
+## Environment variables
+See `.env.example` for all options. Key ones: SOCKS_PORT, SOCKS_USER, SOCKS_PASS, VPN_USER, VPN_PASS, BIND_ADDR, KILL_SWITCH.
+```
+
 ## Quick Start
 
 ### 1. Clone and configure
