@@ -10,6 +10,7 @@ SOCKS_PORT="${SOCKS_PORT:-1080}"
 SOCKS_USER="${SOCKS_USER:-}"
 SOCKS_PASS="${SOCKS_PASS:-}"
 VPN_CONFIG_DIR="${VPN_CONFIG_DIR:-/config}"
+VPN_CONFIG="${VPN_CONFIG:-}"
 DNS_SERVERS="${DNS_SERVERS:-1.1.1.1,8.8.8.8}"
 KILL_SWITCH="${KILL_SWITCH:-true}"
 VPN_LOG_LEVEL="${VPN_LOG_LEVEL:-3}"
@@ -27,6 +28,28 @@ VPN_CONFIG_FILE=""
 # VPN type detection
 # =============================================
 detect_vpn_type() {
+    # If a specific config is requested, detect type from that file only
+    if [[ -n "$VPN_CONFIG" ]]; then
+        local f="$VPN_CONFIG_DIR/$VPN_CONFIG"
+        if [[ ! -f "$f" ]]; then
+            echo "unknown"
+            return
+        fi
+        case "$f" in
+            *.ovpn) echo "openvpn"; return ;;
+        esac
+        if grep -q '^\[Interface\]' "$f" 2>/dev/null; then
+            echo "wireguard"
+            return
+        fi
+        if grep -qE '^(client|remote |proto |dev )' "$f" 2>/dev/null; then
+            echo "openvpn"
+            return
+        fi
+        echo "unknown"
+        return
+    fi
+
     # Check for WireGuard configs (wg*.conf with [Interface] section)
     for f in "$VPN_CONFIG_DIR"/wg*.conf; do
         if [[ -f "$f" ]] && grep -q '^\[Interface\]' "$f" 2>/dev/null; then
@@ -388,7 +411,13 @@ main() {
     fi
 
     # Find config file
-    if [[ "$VPN_TYPE" == "openvpn" ]]; then
+    if [[ -n "$VPN_CONFIG" ]]; then
+        VPN_CONFIG_FILE="$VPN_CONFIG_DIR/$VPN_CONFIG"
+        if [[ ! -f "$VPN_CONFIG_FILE" ]]; then
+            echo "[main] ERROR: Specified config not found: $VPN_CONFIG_FILE"
+            exit 1
+        fi
+    elif [[ "$VPN_TYPE" == "openvpn" ]]; then
         VPN_CONFIG_FILE=$(find_openvpn_config)
     else
         VPN_CONFIG_FILE=$(find_wireguard_config)

@@ -201,11 +201,11 @@ Run several VPN proxies simultaneously, each with a different VPN server and por
 
 ```bash
 # Instance 1: US VPN on port 1080
-CONTAINER_NAME=vpn-us SOCKS_PORT=1080 VPN_CONFIG_PATH=./config/us \
+CONTAINER_NAME=vpn-us SOCKS_PORT=1080 VPN_CONFIG=us-server.ovpn \
   docker compose -p vpn-us up -d
 
 # Instance 2: UK VPN on port 2080
-CONTAINER_NAME=vpn-uk SOCKS_PORT=2080 VPN_CONFIG_PATH=./config/uk \
+CONTAINER_NAME=vpn-uk SOCKS_PORT=2080 VPN_CONFIG=uk-server.ovpn \
   docker compose -p vpn-uk up -d
 
 # Instance 3: Local-only access on port 3080
@@ -235,15 +235,15 @@ A powerful combination is running multiple vpnsocksify instances with [Firefox M
 
 ```bash
 # Romania exit
-CONTAINER_NAME=vpn-ro SOCKS_PORT=1080 VPN_CONFIG_PATH=./config/romania \
+CONTAINER_NAME=vpn-ro SOCKS_PORT=1080 VPN_CONFIG=ro-server.ovpn \
   docker compose -p vpn-ro up -d
 
 # Switzerland exit
-CONTAINER_NAME=vpn-ch SOCKS_PORT=2080 VPN_CONFIG_PATH=./config/switzerland \
+CONTAINER_NAME=vpn-ch SOCKS_PORT=2080 VPN_CONFIG=ch-server.ovpn \
   docker compose -p vpn-ch up -d
 
 # US exit
-CONTAINER_NAME=vpn-us SOCKS_PORT=3080 VPN_CONFIG_PATH=./config/us \
+CONTAINER_NAME=vpn-us SOCKS_PORT=3080 VPN_CONFIG=us-server.ovpn \
   docker compose -p vpn-us up -d
 ```
 
@@ -268,7 +268,8 @@ All settings are configured via environment variables. Set them in `.env` or pas
 | `SOCKS_PASS` | _(empty)_ | SOCKS5 password |
 | `VPN_USER` | _(empty)_ | VPN username (for OpenVPN `auth-user-pass`) |
 | `VPN_PASS` | _(empty)_ | VPN password |
-| `VPN_CONFIG_PATH` | `./config` | Path to VPN config file or directory |
+| `VPN_CONFIG` | _(empty)_ | Config filename to use (auto-detected if empty) |
+| `VPN_CONFIG_PATH` | `./config` | Path to VPN config directory |
 | `BIND_ADDR` | `0.0.0.0` | Bind address (`0.0.0.0` = all interfaces, `127.0.0.1` = local only) |
 | `CONTAINER_NAME` | `vpnsocksifier` | Docker container name |
 | `DNS_SERVERS` | `1.1.1.1,8.8.8.8` | DNS servers (comma-separated) |
@@ -410,10 +411,8 @@ docker compose up -d
 
 [NordVPN](https://refer-nordvpn.com/CKtwPrhUroe) supports OpenVPN config files. WireGuard is available only via their proprietary NordLynx protocol (app-only).
 
-1. Log in to [my.nordaccount.com](https://my.nordaccount.com/)
-2. Go to **Settings** → **Manual setup** → **OpenVPN configuration files**
-3. Download `.ovpn` files for your desired servers
-4. Get your **Service credentials** (under Manual setup) — these are **different from your account password**
+1. Get your **Service credentials** at [Manual configuration → Service credentials](https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/service-credentials/) — these are **different from your account password**
+2. Download `.ovpn` files from [Manual configuration → OpenVPN](https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/openvpn/)
 
 ```bash
 cp us1234.nordvpn.com.udp.ovpn config/

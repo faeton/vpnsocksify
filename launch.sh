@@ -171,9 +171,11 @@ SOCKS_PORT="${SOCKS_PORT:-1080}"
 BIND_ADDR="${BIND_ADDR:-0.0.0.0}"
 CONTAINER_NAME="${CONTAINER_NAME:-vpnsocksifier-${SOCKS_PORT}}"
 
-# If config is a single file, mount its parent directory
+# If config is a single file, mount its parent directory and pass filename via VPN_CONFIG
 VPN_CONFIG_MOUNT="$CONFIG_PATH"
+VPN_CONFIG_NAME=""
 if [[ -f "$CONFIG_PATH" ]]; then
+    VPN_CONFIG_NAME="$(basename "$CONFIG_PATH")"
     VPN_CONFIG_MOUNT="$(dirname "$CONFIG_PATH")"
 fi
 
@@ -212,6 +214,7 @@ CONTAINER_NAME="$CONTAINER_NAME" \
 SOCKS_PORT="$SOCKS_PORT" \
 SOCKS_USER="$SOCKS_USER" \
 SOCKS_PASS="$SOCKS_PASS" \
+VPN_CONFIG="$VPN_CONFIG_NAME" \
 VPN_USER="$VPN_USER" \
 VPN_PASS="$VPN_PASS" \
 BIND_ADDR="$BIND_ADDR" \
