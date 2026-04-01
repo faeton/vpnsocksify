@@ -58,7 +58,30 @@ See `.env.example` for all options. Key ones: SOCKS_PORT, SOCKS_USER, SOCKS_PASS
 
 ## Quick Start
 
-### 1. Clone and configure
+### Option A: Pull from registry (easiest)
+
+```bash
+# Pull the image
+docker pull ghcr.io/faeton/vpnsocksify:latest
+
+# Run directly with your VPN config
+docker run -d \
+  --name vpnsocksify \
+  --cap-add=NET_ADMIN \
+  --device=/dev/net/tun \
+  --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+  --sysctl net.ipv6.conf.all.disable_ipv6=1 \
+  -p 1080:1080 \
+  -v /path/to/your/config:/config:ro \
+  -e SOCKS_USER=myuser \
+  -e SOCKS_PASS=mypass \
+  ghcr.io/faeton/vpnsocksify:latest
+
+# Test it
+curl --proxy socks5h://myuser:mypass@localhost:1080 https://api.ipify.org
+```
+
+### Option B: Clone and build
 
 ```bash
 git clone https://github.com/faeton/vpnsocksify.git
@@ -72,18 +95,11 @@ cp /path/to/wg0.conf config/
 # Create .env from example
 cp .env.example .env
 # Edit .env with your preferred settings (port, auth, etc.)
-```
 
-### 2. Build and run
-
-```bash
+# Build and run
 docker compose build
 docker compose up -d
-```
 
-### 3. Use the proxy
-
-```bash
 # Test it
 curl --proxy socks5h://proxyuser:proxypass@localhost:1080 https://api.ipify.org
 

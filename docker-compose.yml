@@ -1,5 +1,6 @@
 services:
   vpnsocksifier:
+    image: ${IMAGE:-ghcr.io/faeton/vpnsocksify:latest}
     build: .
     container_name: ${CONTAINER_NAME:-vpnsocksifier}
     cap_add:
