@@ -210,7 +210,7 @@ docker exec vpnsocksifier cat /etc/resolv.conf
 
 ### AirVPN
 
-[AirVPN](https://airvpn.org/?referred_by=684381) supports both OpenVPN and WireGuard with full config file downloads.
+[AirVPN](https://airvpn.org/?referred_by=688976) supports both OpenVPN and WireGuard with full config file downloads.
 
 1. Log in at [airvpn.org/generator](https://airvpn.org/generator/)
 2. Select **OpenVPN** or **WireGuard** protocol
@@ -294,7 +294,7 @@ docker compose up -d
 
 | Provider | OpenVPN | WireGuard | Auth Required | Notes |
 |----------|:-------:|:---------:|:-------------:|-------|
-| [AirVPN](https://airvpn.org/?referred_by=684381) | ✅ | ✅ | No (inline certs) | Full config generator |
+| [AirVPN](https://airvpn.org/?referred_by=688976) | ✅ | ✅ | No (inline certs) | Full config generator |
 | [Mullvad](https://mullvad.net) | ✅ (deprecated) | ✅ | Account number | WireGuard preferred |
 | [NordVPN](https://refer-nordvpn.com/CKtwPrhUroe) | ✅ | ❌ | Service credentials | NordLynx is app-only |
 | [ExpressVPN](https://www.expressvpn.com) | ✅ | ❌ | Manual config creds | WireGuard is app-only |
