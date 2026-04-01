@@ -93,10 +93,9 @@ setup_kill_switch() {
     echo "[killswitch] Setting up iptables kill switch..."
     echo "[killswitch] Docker subnet: ${docker_subnet:-unknown}"
 
-    # Flush existing rules
+    # Flush existing filter rules (preserve Docker's NAT rules for port forwarding)
     iptables -F
     iptables -X 2>/dev/null || true
-    iptables -t nat -F
 
     # Default policy: DROP
     iptables -P INPUT DROP
@@ -114,6 +113,10 @@ setup_kill_switch() {
     # Allow SOCKS5 connections inbound (from Docker network + port-mapped host)
     iptables -A INPUT -p tcp --dport "$SOCKS_PORT" -j ACCEPT
     iptables -A OUTPUT -p tcp --sport "$SOCKS_PORT" -m conntrack --ctstate ESTABLISHED -j ACCEPT
+
+    # Allow FORWARD for Docker port-mapped traffic to SOCKS port
+    iptables -A FORWARD -p tcp --dport "$SOCKS_PORT" -j ACCEPT
+    iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
     # Allow DNS on eth0 (needed for VPN server hostname resolution and connectivity tests)
     iptables -A OUTPUT -o eth0 -p udp --dport 53 -j ACCEPT
