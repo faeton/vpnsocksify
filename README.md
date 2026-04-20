@@ -73,7 +73,7 @@ curl --proxy socks5h://myuser:mypass@localhost:1080 https://api.ipify.org
 | `SOCKS_PASS` | _(empty)_ | SOCKS5 auth password |
 | `VPN_USER` | _(empty)_ | OpenVPN auth-user-pass username |
 | `VPN_PASS` | _(empty)_ | OpenVPN auth-user-pass password |
-| `BIND_ADDR` | `0.0.0.0` | Bind address (use `127.0.0.1` for local only) |
+| `BIND_ADDR` | `0.0.0.0` | Bind address (use `127.0.0.1` for local only; public exposure is routed correctly without an extra relay) |
 | `KILL_SWITCH` | `true` | iptables kill switch (prevents leaks) |
 | `DNS_SERVERS` | `1.1.1.1,8.8.8.8` | DNS servers |
 
@@ -292,6 +292,8 @@ Place your VPN config files in the `config/` directory (or specify a path via `V
 **OpenVPN**: Supports inline certificates, external cert files, `auth-user-pass` via env vars, all protocols (UDP/TCP) and ports.
 
 **WireGuard**: Supports standard `wg-quick` configs with `[Interface]`/`[Peer]` sections. In the default IPv4-only mode, provider configs with IPv6 `Address`/`DNS`/`AllowedIPs` entries are normalized automatically at startup, and long provider filenames are handled without manual renaming. Requires the WireGuard kernel module on the Docker host (Linux 5.6+).
+
+When the SOCKS port is published publicly, vpnsocksify keeps SOCKS client control-plane replies on `eth0` and leaves proxied destination traffic on the VPN tunnel. That removes the need for an extra host-side relay just to make public SOCKS exposure work.
 
 ## Security
 

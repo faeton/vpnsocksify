@@ -23,6 +23,10 @@ CONNECTION_TEST_TIMEOUT="${CONNECTION_TEST_TIMEOUT:-60}"
 VPN_TYPE=""
 WG_INTERFACE=""
 VPN_CONFIG_FILE=""
+ETH0_GATEWAY=""
+ETH0_SUBNET=""
+PUBLIC_SOCKS_MARK="0x1"
+PUBLIC_SOCKS_TABLE="100"
 
 # =============================================
 # WireGuard config normalization
@@ -132,13 +136,24 @@ configure_wireguard_routes() {
         endpoint_ip=$(dig +short "$endpoint_host" A | head -1 || echo "")
     fi
 
-    gateway=$(ip route | awk '/default/ {print $3; exit}')
+    gateway="${ETH0_GATEWAY:-$(ip route | awk '/default/ && /dev eth0/ {print $3; exit}')}"
 
     if [[ -n "$endpoint_ip" && -n "$gateway" ]]; then
         ip route replace "$endpoint_ip"/32 via "$gateway" dev eth0
     fi
 
     ip route replace default dev "$WG_INTERFACE"
+}
+
+# =============================================
+# Host network detection
+# =============================================
+detect_host_network() {
+    ETH0_GATEWAY=$(ip route | awk '$1 == "default" && $5 == "eth0" {print $3; exit}')
+    ETH0_SUBNET=$(ip route | awk '$1 ~ /^[0-9]/ && $2 == "dev" && $3 == "eth0" {print $1; exit}')
+
+    echo "[network] eth0 gateway: ${ETH0_GATEWAY:-unknown}"
+    echo "[network] eth0 subnet: ${ETH0_SUBNET:-unknown}"
 }
 
 # =============================================
@@ -252,6 +267,8 @@ setup_kill_switch() {
 
     # Allow SOCKS5 connections inbound (from Docker network + port-mapped host)
     iptables -A INPUT -p tcp --dport "$SOCKS_PORT" -j ACCEPT
+    iptables -A OUTPUT -o eth0 -p tcp --sport "$SOCKS_PORT" -m mark --mark "$PUBLIC_SOCKS_MARK" \
+        -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
     iptables -A OUTPUT -p tcp --sport "$SOCKS_PORT" -m conntrack --ctstate ESTABLISHED -j ACCEPT
 
     # Allow FORWARD for Docker port-mapped traffic to SOCKS port
@@ -306,6 +323,63 @@ setup_kill_switch() {
     ip6tables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
 
     echo "[killswitch] Kill switch active."
+}
+
+# =============================================
+# Public SOCKS reply routing
+# =============================================
+setup_public_socks_routing() {
+    if [[ -z "$ETH0_GATEWAY" || -z "$ETH0_SUBNET" ]]; then
+        echo "[public-socks] Skipping policy routing setup (missing eth0 gateway/subnet)"
+        return
+    fi
+
+    echo "[public-socks] Routing SOCKS client replies via eth0 table $PUBLIC_SOCKS_TABLE"
+
+    iptables -t mangle -N VPNSOCKSIFY_PUBLIC_IN 2>/dev/null || true
+    iptables -t mangle -F VPNSOCKSIFY_PUBLIC_IN
+    iptables -t mangle -N VPNSOCKSIFY_PUBLIC_OUT 2>/dev/null || true
+    iptables -t mangle -F VPNSOCKSIFY_PUBLIC_OUT
+
+    iptables -t mangle -D PREROUTING -j VPNSOCKSIFY_PUBLIC_IN 2>/dev/null || true
+    iptables -t mangle -D OUTPUT -j VPNSOCKSIFY_PUBLIC_OUT 2>/dev/null || true
+    iptables -t mangle -A PREROUTING -j VPNSOCKSIFY_PUBLIC_IN
+    iptables -t mangle -A OUTPUT -j VPNSOCKSIFY_PUBLIC_OUT
+
+    iptables -t mangle -A VPNSOCKSIFY_PUBLIC_IN \
+        -i eth0 \
+        -p tcp --dport "$SOCKS_PORT" \
+        -m conntrack --ctstate NEW,ESTABLISHED,RELATED \
+        -j CONNMARK --set-mark "$PUBLIC_SOCKS_MARK/$PUBLIC_SOCKS_MARK"
+
+    iptables -t mangle -A VPNSOCKSIFY_PUBLIC_OUT \
+        -o eth0 \
+        -p tcp --sport "$SOCKS_PORT" \
+        -m conntrack --ctstate NEW,ESTABLISHED,RELATED \
+        -j CONNMARK --restore-mark
+
+    while ip rule del fwmark "$PUBLIC_SOCKS_MARK" table "$PUBLIC_SOCKS_TABLE" priority 100 2>/dev/null; do
+        :
+    done
+
+    ip route flush table "$PUBLIC_SOCKS_TABLE" 2>/dev/null || true
+    ip route replace "$ETH0_SUBNET" dev eth0 table "$PUBLIC_SOCKS_TABLE"
+    ip route replace default via "$ETH0_GATEWAY" dev eth0 table "$PUBLIC_SOCKS_TABLE"
+    ip rule add fwmark "$PUBLIC_SOCKS_MARK" table "$PUBLIC_SOCKS_TABLE" priority 100
+}
+
+cleanup_public_socks_routing() {
+    while ip rule del fwmark "$PUBLIC_SOCKS_MARK" table "$PUBLIC_SOCKS_TABLE" priority 100 2>/dev/null; do
+        :
+    done
+    ip route flush table "$PUBLIC_SOCKS_TABLE" 2>/dev/null || true
+
+    iptables -t mangle -D PREROUTING -j VPNSOCKSIFY_PUBLIC_IN 2>/dev/null || true
+    iptables -t mangle -D OUTPUT -j VPNSOCKSIFY_PUBLIC_OUT 2>/dev/null || true
+    iptables -t mangle -F VPNSOCKSIFY_PUBLIC_IN 2>/dev/null || true
+    iptables -t mangle -X VPNSOCKSIFY_PUBLIC_IN 2>/dev/null || true
+    iptables -t mangle -F VPNSOCKSIFY_PUBLIC_OUT 2>/dev/null || true
+    iptables -t mangle -X VPNSOCKSIFY_PUBLIC_OUT 2>/dev/null || true
 }
 
 # =============================================
@@ -499,6 +573,8 @@ cleanup() {
     fi
     killall sockd 2>/dev/null || true
 
+    cleanup_public_socks_routing
+
     # Stop VPN
     if [[ "$VPN_TYPE" == "openvpn" ]]; then
         if [[ -f /var/run/openvpn.pid ]]; then
@@ -561,6 +637,8 @@ main() {
         chmod 600 /dev/net/tun
     fi
 
+    detect_host_network
+
     # Setup DNS early so VPN hostname resolution and connectivity checks work
     setup_dns
 
@@ -578,6 +656,9 @@ main() {
 
     # Wait for VPN connection
     wait_for_vpn
+
+    # Keep SOCKS control-plane replies on eth0 for direct public exposure.
+    setup_public_socks_routing
 
     # Generate dante config and start SOCKS5 proxy
     generate_sockd_conf
