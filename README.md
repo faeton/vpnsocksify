@@ -291,7 +291,7 @@ Place your VPN config files in the `config/` directory (or specify a path via `V
 
 **OpenVPN**: Supports inline certificates, external cert files, `auth-user-pass` via env vars, all protocols (UDP/TCP) and ports.
 
-**WireGuard**: Supports standard `wg-quick` configs with `[Interface]`/`[Peer]` sections. Requires the WireGuard kernel module on the Docker host (Linux 5.6+).
+**WireGuard**: Supports standard `wg-quick` configs with `[Interface]`/`[Peer]` sections. In the default IPv4-only mode, provider configs with IPv6 `Address`/`DNS`/`AllowedIPs` entries are normalized automatically at startup, and long provider filenames are handled without manual renaming. Requires the WireGuard kernel module on the Docker host (Linux 5.6+).
 
 ## Security
 
@@ -376,6 +376,7 @@ docker exec vpnsocksifier cat /etc/resolv.conf
 5. Place them in `config/`
 
 > **Note:** AirVPN configs expire 30 minutes after generation. Activate the connection within that window or regenerate.
+> WireGuard exports from AirVPN can be mounted directly; the container will normalize IPv6 fields automatically when running in the default IPv4-only mode.
 
 ```bash
 # OpenVPN (no auth-user-pass needed — certs are inline)

@@ -25,6 +25,123 @@ WG_INTERFACE=""
 VPN_CONFIG_FILE=""
 
 # =============================================
+# WireGuard config normalization
+# =============================================
+normalize_wireguard_config() {
+    local config_file="$1"
+
+    # This image is IPv4-only by default. Strip IPv6-only settings from provider
+    # configs so wg-quick can bring the tunnel up cleanly without weakening the
+    # kill switch or requiring dual-stack support.
+    if [[ "${ENABLE_IPV6:-false}" != "true" ]]; then
+        awk '
+            /^Address[[:space:]]*=/ {
+                sub(/^[^=]*=[[:space:]]*/, "", $0)
+                n = split($0, parts, /,[[:space:]]*/)
+                out = ""
+                for (i = 1; i <= n; i++) {
+                    if (parts[i] !~ /:/) {
+                        out = out (out ? "," : "") parts[i]
+                    }
+                }
+                if (out != "") {
+                    print "Address = " out
+                }
+                next
+            }
+
+            /^DNS[[:space:]]*=/ {
+                sub(/^[^=]*=[[:space:]]*/, "", $0)
+                n = split($0, parts, /,[[:space:]]*/)
+                out = ""
+                for (i = 1; i <= n; i++) {
+                    if (parts[i] !~ /:/) {
+                        out = out (out ? ", " : "") parts[i]
+                    }
+                }
+                if (out != "") {
+                    print "DNS = " out
+                }
+                next
+            }
+
+            /^AllowedIPs[[:space:]]*=/ {
+                sub(/^[^=]*=[[:space:]]*/, "", $0)
+                n = split($0, parts, /,[[:space:]]*/)
+                out = ""
+                for (i = 1; i <= n; i++) {
+                    if (parts[i] !~ /:/) {
+                        out = out (out ? "," : "") parts[i]
+                    }
+                }
+                if (out != "") {
+                    print "AllowedIPs = " out
+                }
+                next
+            }
+
+            { print }
+        ' "$config_file" > "${config_file}.tmp"
+
+        mv "${config_file}.tmp" "$config_file"
+
+    fi
+}
+
+# =============================================
+# WireGuard runtime compatibility
+# =============================================
+prepare_wireguard_runtime() {
+    local src_valid_mark_path="/proc/sys/net/ipv4/conf/all/src_valid_mark"
+    local current_value=""
+    local sysctl_bin
+
+    sysctl_bin=$(command -v sysctl || true)
+    if [[ -z "$sysctl_bin" ]]; then
+        return
+    fi
+
+    if [[ -r "$src_valid_mark_path" ]]; then
+        current_value=$(cat "$src_valid_mark_path" 2>/dev/null || echo "")
+    fi
+
+    # In Docker, this sysctl is often set at container start and then exposed
+    # read-only. wg-quick still tries to set it again and aborts on failure.
+    if [[ "$current_value" == "1" && ! -w "$src_valid_mark_path" ]]; then
+        mkdir -p /tmp/wg-bin
+        cat > /tmp/wg-bin/sysctl <<EOF
+#!/bin/sh
+if [ "\$1" = "-q" ] && [ "\$2" = "net.ipv4.conf.all.src_valid_mark=1" ]; then
+    exit 0
+fi
+exec "$sysctl_bin" "\$@"
+EOF
+        chmod 755 /tmp/wg-bin/sysctl
+        export PATH="/tmp/wg-bin:$PATH"
+    fi
+}
+
+configure_wireguard_routes() {
+    local endpoint_host endpoint_port endpoint_proto endpoint_ip gateway
+
+    read -r endpoint_host endpoint_port endpoint_proto < <(parse_vpn_endpoints | head -1)
+    [[ -n "${endpoint_host:-}" ]] || return
+
+    endpoint_ip="$endpoint_host"
+    if ! echo "$endpoint_host" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+        endpoint_ip=$(dig +short "$endpoint_host" A | head -1 || echo "")
+    fi
+
+    gateway=$(ip route | awk '/default/ {print $3; exit}')
+
+    if [[ -n "$endpoint_ip" && -n "$gateway" ]]; then
+        ip route replace "$endpoint_ip"/32 via "$gateway" dev eth0
+    fi
+
+    ip route replace default dev "$WG_INTERFACE"
+}
+
+# =============================================
 # VPN type detection
 # =============================================
 detect_vpn_type() {
@@ -271,13 +388,20 @@ start_wireguard() {
 
     local iface_name
     iface_name=$(basename "$VPN_CONFIG_FILE" .conf)
+    if [[ ! "$iface_name" =~ ^[A-Za-z0-9_=+.-]{1,15}$ ]]; then
+        iface_name="wg0"
+    fi
     WG_INTERFACE="$iface_name"
 
     mkdir -p /etc/wireguard
     cp "$VPN_CONFIG_FILE" "/etc/wireguard/${iface_name}.conf"
     chmod 600 "/etc/wireguard/${iface_name}.conf"
+    normalize_wireguard_config "/etc/wireguard/${iface_name}.conf"
+    sed -i '/^[[:space:]]*Table[[:space:]]*=.*/d' "/etc/wireguard/${iface_name}.conf"
+    prepare_wireguard_runtime
 
     wg-quick up "$iface_name"
+    configure_wireguard_routes
     echo "[wireguard] Interface $iface_name is up."
 }
 
